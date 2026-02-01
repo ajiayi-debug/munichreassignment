@@ -1,0 +1,14 @@
+pdf2image
+easyocr
+torch
+torchvision
+pypdf
+matplotlib
+Pillow
+opencv-python
+chromadb
+sentence-transformers
+streamlit
+python-dotenv
+google-genai
+certifi
