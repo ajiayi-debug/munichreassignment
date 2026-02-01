@@ -16,36 +16,17 @@ This project implements a **Retrieval-Augmented Generation (RAG)** pipeline that
 
 ### Architecture
 
-```
-┌─────────────────┐     ┌─────────────────┐
-│   PDF Input     │     │  Google Colab   │
-└────────┬────────┘     └────────┬────────┘
-         │                       │
-         ▼                       ▼
-┌─────────────────┐     ┌─────────────────┐
-│    EasyOCR      │     │   Qwen3 VL      │
-│  (Local, CPU)   │     │  (GPU, T4/L4)   │
-└────────┬────────┘     └────────┬────────┘
-         │                       │
-         ▼                       ▼
-┌─────────────────┐     ┌─────────────────┐
-│  Page Chunks    │     │ Page + Paragraph│
-│    (~118)       │     │  Chunks (~561)  │
-└────────┬────────┘     └────────┬────────┘
-         │                       │
-         └───────────┬───────────┘
-                     ▼
-         ┌─────────────────────┐
-         │     ChromaDB        │
-         │  (all-mpnet-base-v2)│
-         │   Cosine Similarity │
-         └──────────┬──────────┘
-                    ▼
-         ┌─────────────────────┐
-         │  Streamlit Chatbot  │
-         │  + Gemini 2.5 Flash │
-         └─────────────────────┘
-```
+![Architecture Diagram](munichre.jpg)
+
+### Why Two OCR Methods?
+
+The dual-OCR approach emerged from practical time constraints:
+
+1. **Qwen VL takes ~12 hours** to process the 120-page PDF on Colab. Given deadline concerns, I set up **EasyOCR first** as a faster fallback (~2-3 minutes locally) to ensure a working pipeline even if time ran out.
+
+2. Once Qwen VL extraction completed, I had **both outputs available**. Rather than discarding one, I made it a feature: the Streamlit app lets users **toggle between OCR sources** to compare retrieval quality.
+
+3. This turned a contingency plan into a **useful comparison tool** for evaluating how different OCR methods affect RAG performance.
 
 ---
 
@@ -74,6 +55,18 @@ This project implements a **Retrieval-Augmented Generation (RAG)** pipeline that
 - **Advantages**: Better handling of tables, complex layouts, and contextual understanding
 - **Image Handling**: The extraction prompt explicitly asks the model to describe any images and explain their relevance to the surrounding text. This captures visual information that EasyOCR would miss.
 
+### Why Qwen3 VL?
+
+Model selection was guided by the [OCR Arena Leaderboard](https://www.ocrarena.ai/leaderboard), which provides battle-tested rankings from head-to-head comparisons across 12,000+ battles.
+
+**Qwen3-VL-8B** ranks competitively among open-source/self-hostable models with a 40.2% win rate. While closed-source models like Gemini 3 Flash and Opus 4.5 rank higher, Qwen3 VL offers:
+- Free to run on Google Colab (T4/L4 GPU)
+- No API costs
+- Full control over the extraction prompt
+- Good balance of quality vs. accessibility
+
+**Alternative Considered**: Initially attempted to use **dots.ocr** (Multilingual Document Layout Parsing in a Single Vision-Language Model), but faced compatibility and installation issues. Qwen3 VL provided a more straightforward setup via Hugging Face Transformers.
+
 > **Note**: In this particular PDF (Principles of Public Health, 1910), most images and figures are already described in the accompanying text, so the impact of EasyOCR's image blindness is minimal. However, for PDFs with standalone diagrams or charts without textual descriptions, Qwen VL would capture significantly more information.
 
 ---
@@ -88,6 +81,14 @@ This project implements a **Retrieval-Augmented Generation (RAG)** pipeline that
 | Qwen VL (paragraph) | **Sliding window** | 3 paragraphs per chunk with 1 paragraph overlap | ~442 |
 | Qwen VL (page) | **Page-based** | One chunk per page for comparison | ~119 |
 
+### Why Different Chunking per OCR Source?
+
+- **EasyOCR → Page-based only**: EasyOCR extracts raw text blocks without preserving paragraph structure. The output is a continuous stream of text per page, making paragraph-level chunking unreliable. Therefore, page boundaries are the only natural split points.
+
+- **Qwen VL → Both paragraph and page**: Qwen's structured markdown output preserves paragraph breaks (double newlines), enabling meaningful paragraph-level chunking. I implemented both strategies to compare retrieval performance:
+  - **Paragraph chunks**: Finer granularity for precise retrieval
+  - **Page chunks**: Direct comparison with EasyOCR under the same chunking strategy
+
 ### Why Multiple Strategies?
 
 - **Page-based**: Preserves full context within a page, good for questions about specific topics
@@ -101,6 +102,21 @@ This project implements a **Retrieval-Augmented Generation (RAG)** pipeline that
   - Strong performance on semantic similarity tasks
 - **Device**: MPS (Apple Silicon) or CPU
 - **Storage**: ChromaDB with **cosine similarity** metric
+
+### Why MPNet over BERT?
+
+We use `all-mpnet-base-v2` instead of BERT-based models due to key architectural improvements:
+
+| Aspect | BERT | MPNet |
+|--------|------|-------|
+| **Pre-training** | Masked Language Modeling (MLM) only | MLM + Permuted Language Modeling (PLM) |
+| **Token Dependencies** | Ignores dependencies between masked tokens | Captures dependencies among all predicted tokens |
+| **Position Information** | Uses absolute position embeddings | Leverages auxiliary position information from PLM |
+| **Sentence Embeddings** | Requires fine-tuning for good embeddings | Natively better at producing meaningful sentence representations |
+
+**Key Insight**: BERT's MLM masks tokens independently, assuming they're unrelated. MPNet's permuted language modeling sees all tokens in the sentence during prediction, learning richer contextual relationships. This makes MPNet embeddings more semantically meaningful for retrieval tasks without additional fine-tuning.
+
+The `all-mpnet-base-v2` variant is further trained on 1B+ sentence pairs for semantic similarity, making it ideal for RAG retrieval.
 
 ---
 
@@ -251,6 +267,16 @@ The chatbot provides:
 ![Question 2](images/question2.png)
 
 ![Question 3](images/question3.png)
+
+### OCR Source Performance Comparison
+
+Based on the screenshots above, different OCR sources perform better depending on query type:
+
+- **Factual questions** → **Qwen (para)** performs best (finer granularity retrieves more precise chunks, higher confidence)
+- **Reasoning/synthesis questions** → **Qwen (page)** performs best (broader context enables better inference and comprehensive answers)
+- **EasyOCR** consistently shows lower confidence scores, likely due to noisier OCR extraction and lack of structural preservation
+
+**Example from screenshots**: For "What are the main ways to fight disease germs?" (factual), Qwen para achieved 84% vs EasyOCR's 77%. For "Why are prevention + clean environment more effective together?" (synthesis), Qwen page provided the best structured answer with direct reasoning about combined effectiveness.
 
 ### Chatbot Prompt
 
