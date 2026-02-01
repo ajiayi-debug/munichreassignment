@@ -16,7 +16,7 @@ This project implements a **Retrieval-Augmented Generation (RAG)** pipeline that
 
 ### Architecture
 
-![Architecture Diagram](munichre.jpg)
+![Architecture Diagram](images/munichre.jpg)
 
 ### Why Two OCR Methods?
 
