@@ -246,11 +246,11 @@ The chatbot provides:
 
 ### Screenshots of Answers
 
-![Question 1](images/Screenshot%202026-02-01%20at%204.23.43%20PM.png)
+![Question 1](images/question1.png)
 
-![Question 2](images/Screenshot%202026-02-01%20at%204.23.52%20PM.png)
+![Question 2](images/question2.png)
 
-![Question 3](images/Screenshot%202026-02-01%20at%204.24.01%20PM.png)
+![Question 3](images/question3.png)
 
 ### Chatbot Prompt
 
