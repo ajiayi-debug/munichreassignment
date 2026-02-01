@@ -59,11 +59,7 @@ The dual-OCR approach emerged from practical time constraints:
 
 Model selection was guided by the [OCR Arena Leaderboard](https://www.ocrarena.ai/leaderboard), which provides battle-tested rankings from head-to-head comparisons across 12,000+ battles.
 
-**Qwen3-VL-8B** ranks competitively among open-source/self-hostable models with a 40.2% win rate. While closed-source models like Gemini 3 Flash and Opus 4.5 rank higher, Qwen3 VL offers:
-- Free to run on Google Colab (T4/L4 GPU)
-- No API costs
-- Full control over the extraction prompt
-- Good balance of quality vs. accessibility
+**Qwen3-VL-8B** ranks competitively among open-source/self-hostable models with a 40.2% win rate.
 
 **Alternative Considered**: Initially attempted to use **dots.ocr** (Multilingual Document Layout Parsing in a Single Vision-Language Model), but faced compatibility and installation issues. Qwen3 VL provided a more straightforward setup via Hugging Face Transformers.
 
